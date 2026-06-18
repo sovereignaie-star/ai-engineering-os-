@@ -1,0 +1,89 @@
+version: '3.8'
+
+networks:
+  aios_network:
+    driver: bridge
+
+services:
+  # ====================== Redis ======================
+  redis:
+    image: redis:7.4-alpine
+    container_name: ai-os-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    restart: unless-stopped
+    command: redis-server --appendonly yes
+    networks:
+      - aios_network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ====================== PostgreSQL ======================
+  postgres:
+    image: postgres:16-alpine
+    container_name: ai-os-postgres
+    environment:
+      POSTGRES_USER: aios
+      POSTGRES_PASSWORD: aios
+      POSTGRES_DB: aios
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    restart: unless-stopped
+    networks:
+      - aios_network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U aios"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ====================== Temporal ======================
+  temporal:
+    image: temporalio/auto-setup:1.25.0
+    container_name: ai-os-temporal
+    environment:
+      - DB=postgresql
+      - DB_HOST=postgres
+      - DB_PORT=5432
+      - DB_USER=aios
+      - DB_PASSWORD=aios
+      - DB_NAME=aios
+    ports:
+      - "7233:7233"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
+    networks:
+      - aios_network
+    healthcheck:
+      test: ["CMD", "tctl", "--address", "localhost:7233", "namespace", "list"]
+      interval: 15s
+      timeout: 10s
+      retries: 5
+
+  # ====================== Temporal UI ======================
+  temporal-ui:
+    image: temporalio/ui:2.28.0
+    container_name: ai-os-temporal-ui
+    environment:
+      - TEMPORAL_ADDRESS=temporal:7233
+    ports:
+      - "8080:8080"
+    depends_on:
+      temporal:
+        condition: service_started
+    restart: unless-stopped
+    networks:
+      - aios_network
+
+volumes:
+  redis_data:
+  postgres_data:
