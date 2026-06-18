@@ -1,0 +1,47 @@
+version: '3.8'
+
+networks:
+  aios_network:
+    driver: bridge
+
+services:
+  redis:
+    image: redis:7.4-alpine
+    container_name: ai-os-redis
+    ports:
+      - "6379:6379"
+    networks:
+      - aios_network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+
+  postgres:
+    image: postgres:16-alpine
+    container_name: ai-os-postgres
+    environment:
+      POSTGRES_USER: aios
+      POSTGRES_PASSWORD: aios
+      POSTGRES_DB: aios
+    ports:
+      - "5432:5432"
+    networks:
+      - aios_network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U aios"]
+
+  temporal:
+    image: temporalio/auto-setup:1.25.0
+    container_name: ai-os-temporal
+    environment:
+      - DB=postgresql
+      - DB_HOST=postgres
+      - DB_USER=aios
+      - DB_PASSWORD=aios
+      - DB_NAME=aios
+    ports:
+      - "7233:7233"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - aios_network
