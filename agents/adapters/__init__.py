@@ -1,5 +1,5 @@
-from .openhands_adapter import OpenHandsAdapter
 from .aider_adapter import AiderAdapter
+from .openhands_adapter import OpenHandsAdapter
 from .swe_adapter import SWEAdapter
 from .opencode_adapter import OpenCodeAdapter
 from .plandex_adapter import PlandexAdapter
